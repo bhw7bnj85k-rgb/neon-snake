@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Neon Snake: Master Edition</title>
+    <style>
+        body { background: #05050a; color: #fff; text-align: center; font-family: 'Courier New', monospace; margin: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+        #ui { margin-bottom: 10px; width: 560px; display: flex; justify-content: space-between; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; font-size: 14px; border-bottom: 1px solid #1a1a2e; padding-bottom: 10px; }
+        #main-layout { display: flex; gap: 20px; align-items: stretch; }
+        #game-container { position: relative; border: 4px solid #1a1a2e; border-radius: 8px; box-shadow: 0 0 40px rgba(0,210,255,0.15); background: #000; }
+        canvas { display: block; }
+        #side-console { width: 160px; display: flex; flex-direction: column; gap: 12px; }
+        .status-box { background: #0a0a14; padding: 12px; border: 1px solid #1a1a2e; border-radius: 4px; font-size: 11px; text-align: left; height: 160px; overflow: hidden; color: #00ff00; }
+        .high-score-box { background: #1a1a2e; padding: 8px; border: 1px solid #00d2ff; border-radius: 4px; font-size: 12px; color: #00d2ff; font-weight: bold; }
+        .btn { padding: 12px; cursor: pointer; border-radius: 4px; border: 1px solid #333; background: #111; color: #fff; font-family: inherit; font-size: 10px; transition: 0.2s; text-transform: uppercase; font-weight: bold; }
+        .btn:hover { background: #222; border-color: #444; }
+        .btn.active { background: #ff0055; border-color: #ff0055; color: #000; box-shadow: 0 0 15px rgba(255,0,85,0.4); }
+        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20; }
+        .footer { margin-top: 20px; font-size: 10px; color: #333; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div style="color: #00d2ff;">USER: <span id="score">0</span></div>
+        <div id="mod-ui" style="color: #ffd700;">STABLE</div>
+        <div style="color: #ffffff; opacity: 0.6;">GHOST: <span id="gScore">0</span></div>
+    </div>
+
+    <div id="main-layout">
+        <div id="game-container">
+            <canvas id="snakeCanvas" width="400" height="400"></canvas>
+            <div id="overlay">
+                <h1 id="end-msg" style="color: #ff0055; margin-bottom: 20px; font-size: 22px;">CORE CRASHED</h1>
+                <button class="btn" style="padding: 15px 30px; font-size: 12px;" onclick="resetGame()">RE-ESTABLISH LINK</button>
+            </div>
+        </div>
+
+        <div id="side-console">
+            <div class="high-score-box">BEST: <span id="highScore">0</span></div>
+            <div class="status-box" id="log">
+                <div>> INITIALIZING...</div>
+                <div>> CORE LOADED</div>
+            </div>
+            <button id="aiBtn" class="btn" onclick="toggleOverclock()">AI OVERCLOCK</button>
+            <button class="btn" style="margin-top: auto; color: #00d2ff; border-color: #00d2ff;" onclick="resetGame()">SYSTEM RESET</button>
+        </div>
+    </div>
+
+    <div class="footer">POWERED BY GEMINI</div>
+
+    <script>
+        const canvas = document.getElementById('snakeCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score'), gScoreEl = document.getElementById('gScore');
+        const highEl = document.getElementById('highScore'), modEl = document.getElementById('mod-ui'), aiBtn = document.getElementById('aiBtn');
+        const logEl = document.getElementById('log'), overlay = document.getElementById('overlay');
+
+        const grid = 20;
+        let count = 0, score = 0, gScore = 0, gameActive = true, overclock = false;
+        
+        // Load High Score
+        let highScore = localStorage.getItem('snakeHighScore') || 0;
+        highEl.innerText = highScore;
+
+        let snake = { x: 160, y: 160, dx: grid, dy: 0, cells: [], maxCells: 4 };
+        let ghost = { x: 0, y: 0, dx: grid, dy: 0, cells: [], maxCells: 4 };
+        let apple = { x: 320, y: 320 };
+
+        function addLog(msg, color="#00ff00") {
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.innerHTML = `> ${msg}`;
+            logEl.prepend(div);
+            if(logEl.childNodes.length > 8) logEl.lastChild.remove();
+        }
+
+        function toggleOverclock() {
+            overclock = !overclock;
+            aiBtn.classList.toggle('active');
+            modEl.innerText = overclock ? "OVERCLOCKED" : "STABLE";
+            modEl.style.color = overclock ? "#ff0055" : "#ffd700";
+            addLog(overclock ? "AI UNLEASHED" : "AI THROTTLED", overclock ? "#ff0055" : "#ffd700");
+        }
+
+        function resetGame() {
+            snake = { x: 160, y: 160, dx: grid, dy: 0, cells: [], maxCells: 4 };
+            ghost = { x: 0, y: 0, dx: grid, dy: 0, cells: [], maxCells: 4 };
+            score = 0; gScore = 0;
+            scoreEl.innerText = 0; gScoreEl.innerText = 0;
+            overlay.style.display = 'none';
+            gameActive = true;
+            addLog("SYSTEM REBOOTED");
+        }
+
+        function loop() {
+            if (!gameActive) return requestAnimationFrame(loop);
+            requestAnimationFrame(loop);
+            if (++count < 7) return;
+            count = 0;
+
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+
+            snake.x += snake.dx; snake.y += snake.dy;
+            if (snake.x < 0) snake.x = canvas.width - grid; else if (snake.x >= canvas.width) snake.x = 0;
+            if (snake.y < 0) snake.y = canvas.height - grid; else if (snake.y >= canvas.height) snake.y = 0;
+            snake.cells.unshift({x: snake.x, y: snake.y});
+            if (snake.cells.length > snake.maxCells) snake.cells.pop();
+
+            let tx = apple.x, ty = apple.y;
+            if (overclock) { tx = (apple.x + snake.x) / 2; ty = (apple.y + snake.y) / 2; }
+            if (ghost.x < tx) ghost.dx = grid; else if (ghost.x > tx) ghost.dx = -grid;
+            else if (ghost.y < ty) ghost.dy = grid; else if (ghost.y > ty) ghost.dy = -grid;
+            ghost.x += ghost.dx; ghost.y += ghost.dy;
+            ghost.cells.unshift({x: ghost.x, y: ghost.y});
+            if (ghost.cells.length > ghost.maxCells) ghost.cells.pop();
+
+            if (snake.x === apple.x && snake.y === apple.y) {
+                snake.maxCells++; score++; scoreEl.innerText = score;
+                addLog("DATA ACQUIRED", "#00d2ff");
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snakeHighScore', highScore);
+                    highEl.innerText = highScore;
+                }
+                apple.x = Math.floor(Math.random()*20)*grid; apple.y = Math.floor(Math.random()*20)*grid;
+            }
+            if (ghost.x === apple.x && ghost.y === apple.y) {
+                ghost.maxCells++; gScore++; gScoreEl.innerText = gScore;
+                addLog("AI BREACH", "#ff0055");
+                apple.x = Math.floor(Math.random()*20)*grid; apple.y = Math.floor(Math.random()*20)*grid;
+            }
+
+            ctx.fillStyle = '#ff00ff'; ctx.fillRect(apple.x+1, apple.y+1, grid-2, grid-2);
+            ctx.strokeStyle = overclock ? '#ff0055' : '#fff';
+            ghost.cells.forEach(c => ctx.strokeRect(c.x+2, c.y+2, grid-4, grid-4));
+            snake.cells.forEach((c, i) => {
+                ctx.fillStyle = `hsl(${190 + (i*2)}, 100%, 50%)`;
+                ctx.fillRect(c.x+1, c.y+1, grid-2, grid-2);
+                if(c.x === ghost.x && c.y === ghost.y) endGame("GHOST CONTACT");
+                for (let j = i + 1; j < snake.cells.length; j++) if (c.x === snake.cells[j].x && c.y === snake.cells[j].y) endGame("SELF COLLISION");
+            });
+        }
+
+        function endGame(reason) { gameActive = false; overlay.style.display = 'flex'; addLog(reason, "#ff0055"); }
+        document.addEventListener('keydown', e => {
+            if (e.which === 37 && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+            else if (e.which === 38 && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+            else if (e.which === 39 && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+            else if (e.which === 40 && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
+        });
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
